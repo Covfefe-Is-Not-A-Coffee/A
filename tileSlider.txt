@@ -1,0 +1,200 @@
+local uis = game:GetService("UserInputService")--I'm so sorry for not reading https://hiddendevs.com/bulletin?id=2
+local cP = game:GetService("ContentProvider")
+local tween = game:GetService("TweenService")
+local debris = game:GetService("Debris")
+local plr = game.Players.LocalPlayer
+local playerGui = plr.PlayerGui
+local screen = Instance.new("ScreenGui",playerGui)
+local frame = Instance.new("TextLabel",screen)
+local leftTime, clock = 0,Instance.new("Frame",screen)
+local isMobile = (uis.TouchEnabled and not uis.KeyboardEnabled and not uis.MouseEnabled)
+screen.IgnoreGuiInset = true
+screen.ResetOnSpawn = false
+frame.AnchorPoint = isMobile and Vector2.new(0,1/2) or Vector2.new(1/2,1/2)
+frame.Position = isMobile and UDim2.fromScale(0.1,1/2) or UDim2.fromScale(1/2,1/2)
+frame.Size = UDim2.fromScale(1/2,1/2)
+frame.SizeConstraint = Enum.SizeConstraint.RelativeYY
+frame.TextScaled =  true
+frame.TextStrokeTransparency = 0
+frame.TextStrokeColor3 = Color3.new(1,1,1) 
+frame.BackgroundTransparency = 1
+frame.Text = isMobile and "Press Start button to start." or "Press Shift to start, \nSpace Bar to pick/drop a tile, \nWASD to move."
+clock.Size = UDim2.fromScale(1,1)
+clock.ZIndex = 0
+clock.AnchorPoint = Vector2.new(1/2,1/2)
+clock.Position = UDim2.fromScale(1/2,1/2)
+local difficulty, size, r, gameEnded = 200,0,0,true
+local selectedPos, selectedTile, tiles, answerTiles, lastInput = {}, nil, {},{},0
+local totallyUseless = {"rbxassetid://12222140","rbxassetid://12221967","rbxassetid://12222152","rbxassetid://12222253","rbxassetid://12221944","rbxassetid://12221976","rbxassetid://12221984"}
+local function getIndex(ta, value)
+	for i, v in pairs(ta) do
+		if v == value then
+			return i
+		end
+	end
+end
+local function applyTileMovement()
+	for i, v in ipairs(tiles) do
+		local tile = frame:FindFirstChild(i)
+		if v[1] == selectedPos[1] and v[2] == selectedPos[2] then --highlight to selected pos
+			tile.TextStrokeColor3 = Color3.new(0, 0, 0)
+			tile.TextColor3 = Color3.new(1,1,1)
+		else
+			tile.TextStrokeColor3 = Color3.new(1,1,1)
+			tile.TextColor3 = Color3.new(0, 0, 0)
+		end
+		local tw = tween:Create(tile,TweenInfo.new(1/10,Enum.EasingStyle.Cubic),{Position = UDim2.fromScale(1/r*(tiles[i][1]-1),1/r*(tiles[i][2]-1))})
+		tw:Play()
+	end
+end
+local function calculForWin()
+	local win = true
+	for i, v in ipairs(tiles) do
+		if answerTiles[i][1]~=v[1] or answerTiles[i][2]~=v[2] then --Check for worng tile
+			win = false
+			break
+		end
+	end
+	return win
+end
+local function calculMoving(Num,Add)
+	totallyUseless[1]:play()
+	lastInput = tick()
+	if selectedPos[Num]+Add < 1 or selectedPos[Num]+Add > r then 
+		return 
+	end
+	selectedPos[Num] = selectedPos[Num] + Add
+	local index = getIndex(tiles,selectedTile)
+	if selectedTile then
+		tiles[index][Num] = selectedPos[Num]
+		for i, v in ipairs(tiles) do
+			local vindex = getIndex(tiles,v)
+			if (selectedPos[1] == v[1] and selectedPos[2] == v[2]) and selectedTile ~= v then--stop tile collisiion
+				tiles[vindex][Num]=math.clamp(tiles[vindex][Num]-Add,1,r)
+				break
+			end
+		end
+	end
+end
+local function whatTheHeckICantPickItUp()
+	lastInput = tick()
+	if selectedTile then
+		selectedTile = nil
+		totallyUseless[3]:play()
+	else
+		for i, v in ipairs(tiles) do
+			if v[1]==selectedPos[1] and v[2]==selectedPos[2] then
+				selectedTile = v
+				totallyUseless[2]:play()
+				break
+			end
+		end
+	end
+end
+local function tileExists(pos)
+	for _, v in ipairs(tiles) do
+		if (v[1] == pos[1] and v[2] == pos[2]) then
+			return true
+		end
+	end
+	return false
+end
+local function shuffleTile()--did you heard about shuffling horror
+	totallyUseless[5]:play()
+	gameEnded=true
+	local index = 0
+	size = difficulty^2
+	r = size^(1/2)
+	leftTime = math.clamp(size*5+10,6,1800)
+	frame:ClearAllChildren()
+	tiles = {} --reset tile data
+	local rp = math.random(1,r)
+	selectedPos = {rp,rp}
+	selectedTile = nil
+	for y = 1, r do
+		for x=1, r do
+			index += 1
+			answerTiles[index] = {x,y}
+		end
+	end
+	for i = 1, size do
+		local pos
+		repeat
+			pos = {math.random(1, r), math.random(1, r)} --smaller code for small game
+		until not tileExists(pos) -- no same positions
+		local tile = Instance.new("TextLabel",frame)
+		tile.Size = UDim2.fromScale(1/r,1/r)
+		tile.Text = i
+		tile.BackgroundColor3 = Color3.new(0,0,0):Lerp(Color3.new(1,1,1),i/size)
+		tile.Name = i
+		tile.TextStrokeTransparency = 0
+		tile.TextScaled =  true
+		tiles[i] = pos
+	end
+	applyTileMovement()
+	gameEnded=false
+		for i=0, leftTime do
+			task.wait(1)
+			totallyUseless[6]:play()
+			tween:Create(clock,TweenInfo.new(1,Enum.EasingStyle.Cubic),{Size=UDim2.fromScale(i/leftTime*3/4+1/4,i/leftTime*3/4+1/4),BackgroundColor3= Color3.new(1,1,1):Lerp(Color3.new(3/4,0,0),i/leftTime),Transparency=1-i/leftTime}):Play()
+			if gameEnded then
+				break
+			end
+		end
+		if not gameEnded then
+		gameEnded = true
+		totallyUseless[7]:play()
+		end
+	tween:Create(clock,TweenInfo.new(1,Enum.EasingStyle.Cubic),{Size=UDim2.fromScale(0,0),BackgroundColor3= Color3.new(1,1,1),Transparency=1}):Play()
+end
+if isMobile then
+	local buttonInfo = {{UDim2.new(1/2,150,1/2,-50),"Up",{2,-1}},{UDim2.new(1/2,100,1/2,0),"Left",{1,-1}},{UDim2.new(1/2,200,1/2,0),"Right",{1,1}},{UDim2.new(1/2,150,1/2,50),"Down",{2,1}},{UDim2.new(1/2,150,1/2,0),"Pick/Drop"},{UDim2.new(1/2,150,1/2,150),"Start"}}
+	for i, v in ipairs(buttonInfo) do
+		local bu = Instance.new("TextButton",screen)
+		bu.AnchorPoint = Vector2.new(1/2,1/2)
+		bu.Position = v[1]
+		bu.Text = v[2]
+		bu.Size = UDim2.fromOffset(50,50)
+		bu.MouseButton1Click:Connect(function()
+			if tick()-lastInput < 1/10 then return end
+			if i==5 and gameEnded == false then
+				whatTheHeckICantPickItUp()
+			elseif i==6 and gameEnded then
+				shuffleTile()
+			elseif gameEnded == false then
+				calculMoving(unpack(v[3]))
+			end
+			applyTileMovement()
+		end)
+	end
+end
+uis.InputBegan:Connect(function(key)
+		if tick()-lastInput < 1/10 then return end -- to stop SPAM
+		if not gameEnded then
+		if key.KeyCode == Enum.KeyCode.W then
+			calculMoving(2,-1)--moving yPos
+		elseif key.KeyCode == Enum.KeyCode.S then
+			calculMoving(2,1)
+		elseif key.KeyCode == Enum.KeyCode.A then
+			calculMoving(1,-1)--moving XPos
+		elseif key.KeyCode == Enum.KeyCode.D then
+			calculMoving(1,1)
+		elseif key.KeyCode == Enum.KeyCode.Space then
+			whatTheHeckICantPickItUp()
+		end
+		if calculForWin() then
+			totallyUseless[4]:play()
+			difficulty +=1 --makes game more difficult
+			gameEnded = true
+		end
+		end
+	if (key.KeyCode == Enum.KeyCode.LeftShift or key.KeyCode == Enum.KeyCode.RightShift) and gameEnded then
+		shuffleTile()
+	end
+		applyTileMovement()
+end)
+for i, v in ipairs(totallyUseless) do
+	local sound = Instance.new("Sound",script) --I made sure to made them loadable and bloxy
+	sound.SoundId = totallyUseless[i]
+	totallyUseless[i] = sound
+end
